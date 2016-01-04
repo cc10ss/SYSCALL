@@ -1,1 +1,55 @@
 
+SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
+{
+	struct file *filp;
+	int error = -EBADF;
+	int fput_needed;
+
+	filp = fget_light(fd, &fput_needed);
+	if (!filp)
+		goto out;
+
+	error = security_file_ioctl(filp, cmd, arg);
+	if (error)
+		goto out_fput;
+
+	error = do_vfs_ioctl(filp, fd, cmd, arg);
+ out_fput:
+	fput_light(filp, fput_needed);
+ out:
+	return error;
+}
+
+第 8 行 : 
+          通过文件描述符fd来获取到struct file对象的指针file
+          struct task_struct
+	        {
+	        	...
+	        	struct files_struct *files;
+	        	...
+	        };
+	        
+	        struct files_struct 
+	        {
+	        	atomic_t count;
+		        ...
+	        	int next_fd;
+		        ...
+		        struct file * fd_array[NR_OPEN_DEFAULT];
+	        };
+	        
+	        struct file 
+	        {
+          	...
+          	const struct file_operations	*f_op;//文件操作集合
+          	...
+          	atomic_long_t		f_count;            //文件引用计数，即当前有多少进程打开了这个文件
+          	...
+          	loff_t			f_pos;                  //当前文件读写位置
+          };
+          
+	        每个进程中都保存一文件描述符表。文件描述符就是这个表的索引，每一个表项存放一个指向已打开文件(struct file )的指针
+	        
+	        
+	        
+
